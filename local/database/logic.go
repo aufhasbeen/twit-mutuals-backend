@@ -100,7 +100,7 @@ func Init(dbSystem dbType) {
 func FetchUser(userID int64) {
 }
 
-// belong
+// begin
 type metric int
 
 const (
@@ -114,4 +114,11 @@ func FetchTop(top int, userID int64) {
 
 }
 
-// belong
+// end
+
+// FetchMutuals returns a list from the database of the mutuals of the User
+// with userID as its key.
+func FetchMutuals(userID int64) []Mutual {
+	// query the db for all the mutuals pertaining to user with userID
+	return make([]Mutual, 0)
+}

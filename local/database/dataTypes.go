@@ -9,7 +9,7 @@ type User struct {
 }
 
 // Mutual tracks the mutuals of User and tracks the number of interactions
-// and User between mutual
+// between Mutual and User
 type Mutual struct {
 	UserID int64 `gorm:"primary_key;auto_increment:false"`
 

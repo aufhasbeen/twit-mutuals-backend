@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/ChimeraCoder/anaconda"
+	"github.com/aufheben/mutuals-server/local/database"
 )
 
 var twitter *anaconda.TwitterApi
@@ -15,6 +16,11 @@ func Init() {
 	// consumer keys are per user
 	// pass them per request
 	twitter = anaconda.NewTwitterApiWithCredentials(accessToken, accessTokenSecret, consumerKey, consumerKeySecret)
+}
+
+// InitPerUser initializes the twitter client with a specic user to be accessed
+func InitPerUser(oathToken string, oathTokenSecret string) {
+	twitter = anaconda.NewTwitterApiWithCredentials(oathToken, oathTokenSecret, consumerKey, consumerKeySecret)
 }
 
 // collectFriends collects friends into a slice from a given list and sorts
@@ -63,6 +69,84 @@ func collectFollowers(friendsChannel chan anaconda.FollowersPage) chan []anacond
 
 	return list
 }
+
+// intersectSortedUsers return a third slice that includes only elements that are present in both
+func intersectSortedUsers(slice1, slice2 []anaconda.User, comp func(int, int) (bool, bool)) []anaconda.User {
+	var finalSlice []anaconda.User
+
+	for i, j := 0, 0; i < len(slice1) && j < len(slice2); {
+		eq, less := comp(i, j)
+
+		if less {
+			i++
+		} else if eq {
+			finalSlice = append(finalSlice, slice1[i])
+			i++
+			j++
+		} else {
+			j++
+		}
+	}
+	return finalSlice
+}
+
+// GetMutuals retrieves a list of mutuals from a given username
+func GetMutuals(screenName string) []anaconda.User {
+	following, followers := getMutualsLists(screenName)
+
+	mutualsSlice := make([]anaconda.User, 0)
+	mutualsSlice = intersectSortedUsers(followers, following, func(i, j int) (bool, bool) {
+		return followers[i].Id == following[j].Id, followers[i].Id < following[i].Id
+	})
+
+	return mutualsSlice
+}
+
+//
+func getMutualsLists(screenName string) ([]anaconda.User, []anaconda.User) {
+	var queries url.Values
+
+	queries.Add("screen_name", screenName)
+	friends := twitter.GetFriendsListAll(queries)
+	followers := twitter.GetFollowersListAll(queries)
+
+	friendsList := <-collectFriends(friends)
+	follwersList := <-collectFollowers(followers)
+	return friendsList, follwersList
+}
+
+func GetUnfollowingMutualsSorted(databaseList []database.Mutual, followersList []anaconda.User) []database.Mutual {
+	// assumes databaseList and followersList are sorted
+	unfollowedMutuals := make([]database.Mutual, 0)
+	comp := func(i, j int) (bool, bool) {
+		return databaseList[i].UserID == followersList[j].Id,
+			databaseList[j].UserID < followersList[j].Id
+	}
+	databaseListLength := len(databaseList)
+	followersListLength := len(followersList)
+
+	for i, j := 0, 0; i < databaseListLength && j < followersListLength; {
+
+		eq, less := comp(i, j)
+
+		if eq {
+			i++
+			j++
+		} else if less {
+			unfollowedMutuals = append(unfollowedMutuals, databaseList[i])
+			i++
+		} else {
+			j++
+		}
+	}
+	return unfollowedMutuals
+}
+
+// above get mutuals
+
+//
+
+// below filters for interactions
 
 // GetFilteredRetweets returns a list of twitter users that the authenticated
 // user has retweeted.
@@ -152,49 +236,4 @@ func interactionsUser(comparisonUser anaconda.User, analysesUser anaconda.User) 
 	// (likes ftu, retweets ftu, replies ftu, total ftu, total)
 	// ftu = from target user
 
-}
-
-// intersectSortedUsers return a third slice that includes only elements that are present in both
-func intersectSortedUsers(slice1, slice2 []anaconda.User, comp func(int, int) (bool, bool)) []anaconda.User {
-	var finalSlice []anaconda.User
-
-	for i, j := 0, 0; i < len(slice1) && j < len(slice2); {
-		eq, less := comp(i, j)
-
-		if less {
-			i++
-		} else if eq {
-			finalSlice = append(finalSlice, slice1[i])
-			i++
-			j++
-		} else {
-			j++
-		}
-	}
-	return finalSlice
-}
-
-// GetMutuals retrieves a list of mutuals from a given username
-func GetMutuals(screenName string) []anaconda.User {
-	following, followers := getMutualsLists(screenName)
-
-	mutualsSlice := make([]anaconda.User, 0)
-	mutualsSlice = intersectSortedUsers(followers, following, func(i, j int) (bool, bool) {
-		return followers[i].Id == following[j].Id, followers[i].Id < following[i].Id
-	})
-
-	return mutualsSlice
-}
-
-//
-func getMutualsLists(screenName string) ([]anaconda.User, []anaconda.User) {
-	var queries url.Values
-
-	queries.Add("screen_name", screenName)
-	friends := twitter.GetFriendsListAll(queries)
-	followers := twitter.GetFollowersListAll(queries)
-
-	friendsList := <-collectFriends(friends)
-	follwersList := <-collectFollowers(followers)
-	return friendsList, follwersList
 }
