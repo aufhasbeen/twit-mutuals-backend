@@ -115,9 +115,10 @@ func getMutualsLists(screenName string) ([]anaconda.User, []anaconda.User) {
 	return friendsList, follwersList
 }
 
-func GetUnfollowingMutualsSorted(databaseList []database.Mutual, followersList []anaconda.User) []database.Mutual {
+// GetUnfollowingMutualsSorted something
+func GetUnfollowingMutualsSorted(databaseList []database.User, followersList []anaconda.User) []database.User {
 	// assumes databaseList and followersList are sorted
-	unfollowedMutuals := make([]database.Mutual, 0)
+	unfollowedMutuals := make([]database.User, 0)
 	comp := func(i, j int) (bool, bool) {
 		return databaseList[i].UserID == followersList[j].Id,
 			databaseList[j].UserID < followersList[j].Id
@@ -165,8 +166,8 @@ func GetFilteredRetweets(user anaconda.User) ([]anaconda.Tweet, error) {
 
 		// removes the user from his own timeline
 		filteredTweets = filterTweetsByID(tweets, user.Id)
-		lastTweetId := strconv.FormatInt(tweets[len(tweets)-1].Id+1, 10)
-		settings.Set("max_id", lastTweetId)
+		lastTweetID := strconv.FormatInt(tweets[len(tweets)-1].Id+1, 10)
+		settings.Set("max_id", lastTweetID)
 	}
 
 	return filteredTweets, nil
@@ -174,6 +175,8 @@ func GetFilteredRetweets(user anaconda.User) ([]anaconda.Tweet, error) {
 
 // the two get filtered functions are remarkably similar see if you
 // can join the two together in some way. not critical
+
+// GetFilteredReplies something
 func GetFilteredReplies(user anaconda.User) ([]anaconda.Tweet, error) {
 	var settings url.Values
 	var filteredTweets []anaconda.Tweet
@@ -190,14 +193,15 @@ func GetFilteredReplies(user anaconda.User) ([]anaconda.Tweet, error) {
 		// need to change to new function, this one filters by what user
 		// posted the reply not to what user the reply was posted to.
 		filteredTweets = filterTweetsByID(tweets, user.Id)
-		lastTweetId := strconv.FormatInt(tweets[len(tweets)-1].Id+1, 10)
-		settings.Set("max_id", lastTweetId)
+		lastTweetID := strconv.FormatInt(tweets[len(tweets)-1].Id+1, 10)
+		settings.Set("max_id", lastTweetID)
 	}
 
 	return filteredTweets, nil
 
 }
 
+// GetCollectedLikes something
 func GetCollectedLikes() ([]anaconda.Tweet, error) {
 	var settings url.Values
 	settings.Add("count", "200")
@@ -212,17 +216,17 @@ func GetCollectedLikes() ([]anaconda.Tweet, error) {
 
 		// need to change to new function, this one filters by what user
 		// posted the reply not to what user the reply was posted to.
-		lastTweetId := strconv.FormatInt(favoriteTweets[len(favoriteTweets)-1].Id+1, 10)
-		settings.Set("max_id", lastTweetId)
+		lastTweetID := strconv.FormatInt(favoriteTweets[len(favoriteTweets)-1].Id+1, 10)
+		settings.Set("max_id", lastTweetID)
 	}
 	return favoriteTweets, nil
 }
 
 // filters tweets by id
-func filterTweetsByID(tweets []anaconda.Tweet, Id int64) []anaconda.Tweet {
+func filterTweetsByID(tweets []anaconda.Tweet, ID int64) []anaconda.Tweet {
 	filteredTweets := make([]anaconda.Tweet, 0)
 	for _, tweet := range tweets {
-		if tweet.User.Id != Id {
+		if tweet.User.Id != ID {
 			filteredTweets = append(filteredTweets, tweet)
 		}
 	}

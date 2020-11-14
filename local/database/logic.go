@@ -7,9 +7,9 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/jinzhu/gorm"
-	_ "github.com/jinzhu/gorm/dialects/postgres" // database definition
-	_ "github.com/jinzhu/gorm/dialects/sqlite"   // database definition
+	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 var db *gorm.DB // test
@@ -67,8 +67,8 @@ func configFromFile() config {
 type dbType int
 
 const (
-	postgres dbType = iota
-	sqlite
+	postgresDriver dbType = iota
+	sqliteDriver
 )
 
 // Init initializes and connects to the database which will be used by later
@@ -78,26 +78,49 @@ func Init(dbSystem dbType) {
 
 	switch dbSystem {
 
-	case postgres:
-		db, err = gorm.Open("postgres", configFromFile().toString())
+	case postgresDriver:
+		db, err = gorm.Open(postgres.Open("users.db"), &gorm.Config{})
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 
-	case sqlite:
-		db, err = gorm.Open("sqlite", "/file/location.db")
+	case sqliteDriver:
+		db, err = gorm.Open(sqlite.Open("users.db"), &gorm.Config{})
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 
 	}
 
+	primeDb()
+
+}
+
+func primeDb() {
+	db.AutoMigrate(&User{}) // , &Mutual{})
 }
 
 // Actual beginning of database queries
 
+// SubmitUser uploads the user to the database ensuring a unique id
+func SubmitUser(user *User) {
+	db.Save(user)
+}
+
 // FetchUser retrieves a user and their mutual list
-func FetchUser(userID int64) {
+func FetchUser(userID int64) User {
+	var user User
+	db.First(&user, userID)
+	return user
+}
+
+// FetchUserWithMutuals fetches the user and all it's Mutuals
+func FetchUserWithMutuals(userID int64) User {
+	var user User
+	user.UserID = userID
+	db.Preload("Mutuals").First(&user)
+	return user
+
 }
 
 // begin
@@ -118,7 +141,7 @@ func FetchTop(top int, userID int64) {
 
 // FetchMutuals returns a list from the database of the mutuals of the User
 // with userID as its key.
-func FetchMutuals(userID int64) []Mutual {
-	// query the db for all the mutuals pertaining to user with userID
-	return make([]Mutual, 0)
-}
+// func FetchMutuals(userID int64) ([]Mutual, error) {
+// 	// query the db for all the mutuals pertaining to user with userID
+// 	return make([]Mutual, 0), nil
+// }

@@ -7,6 +7,8 @@ import (
 	"github.com/ChimeraCoder/anaconda"
 )
 
+// TODO: rethink this file. should be using the data types from database package
+
 type userScorestruct struct {
 	user     *User
 	total    int
@@ -16,7 +18,7 @@ type userScorestruct struct {
 }
 
 type User struct {
-	Id         int64
+	ID         int64
 	mutuals    []anaconda.User // needs to be sorted
 	OAuthToken string
 	topTen     []userScorestruct
@@ -40,7 +42,7 @@ func (u *User) makeMutualsMap() map[int64]int {
 // analyzeMutuals helpers
 // much of this function could be moved to reusable helpers
 func (u *User) byLikes() {
-	type likeIdCount struct {
+	type likeIDCount struct {
 		id  int64
 		val int
 	}
@@ -56,7 +58,7 @@ func (u *User) byLikes() {
 
 	// retrieve a clean map of zeroed out mutuals
 	mutualsMap := u.makeMutualsMap()
-	mutualsList := make([]likeIdCount, 0)
+	mutualsList := make([]likeIDCount, 0)
 
 	// if the tweet was made by a mutual then add one interaction to that
 	// mutual
@@ -67,8 +69,8 @@ func (u *User) byLikes() {
 	}
 
 	// flatten out the map so that it is a sortable list
-	for userId, likeCount := range mutualsMap {
-		mutualLikeCount := likeIdCount{userId, likeCount}
+	for userID, likeCount := range mutualsMap {
+		mutualLikeCount := likeIDCount{userID, likeCount}
 		mutualsList = append(mutualsList, mutualLikeCount)
 	}
 
