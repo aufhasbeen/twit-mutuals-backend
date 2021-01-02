@@ -63,7 +63,7 @@ func TestFetchUserWithMutuals(t *testing.T) {
 	SubmitUser(&dummyUserA)
 	SubmitUser(&dummyUserB)
 
-	dbUser = FetchUserWithMutuals(dummyUserA.UserID)
+	dbUser, _ = FetchUserWithMutuals(dummyUserA.UserID)
 	aPresent := dummyUserA.UserID == dbUser.UserID
 	bLinkPresent := dummyUserB.UserID == dbUser.Mutuals[0].UserID
 

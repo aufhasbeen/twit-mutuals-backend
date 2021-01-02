@@ -6,6 +6,19 @@ import (
 	"github.com/ChimeraCoder/anaconda"
 )
 
+func setup() {
+	accessToken = ""
+	accessTokenSecret = ""
+	consumerKey = ""
+	consumerKeySecret = ""
+	Init()
+}
+
+func TestMain(m *testing.M) {
+	setup()
+	m.Run()
+}
+
 func TestTestSliceReflectionUser(test *testing.T) {
 	arr1 := make([]anaconda.User, 6)
 	arr2 := make([]anaconda.User, 3)
@@ -24,5 +37,15 @@ func TestTestSliceReflectionUser(test *testing.T) {
 
 	if !(result[0].Id == 3 && result[1].Id == 4 && result[2].Id == 5) {
 		test.Errorf("Result was %#v", arr2)
+	}
+}
+
+func TestGetMutuals(test *testing.T) {
+	screenName := ""
+
+	mutuals := GetMutuals(screenName)
+
+	if len(mutuals) > 0 {
+		print(mutuals[0])
 	}
 }

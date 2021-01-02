@@ -1,9 +1,14 @@
 package database
 
+import "time"
+
 // User tracks the users that have registered to the application and associates
 // them to mutuals and their analysis
 type User struct {
-	UserID int64 `gorm:"primaryKey"`
+	UserID            int64 `gorm:"primaryKey"`
+	Token             string
+	TokenSecret       string
+	TimeTokenInserted string
 
 	Mutuals []User `gorm:"many2many:mutual_refer"`
 }
@@ -29,8 +34,15 @@ type MutualStatistics struct {
 // User methods
 
 // AddMutual adds a single mutual to the user list
-func (u *User) AddMutual(m ...User) {
+func (u User) AddMutual(m ...User) {
 	u.Mutuals = append(u.Mutuals, m...)
+}
+
+// RefreshToken sets the new token and the time it was first known by the system.
+func (u User) RefreshToken(token, secret string) {
+	u.Token = token
+	u.TokenSecret = secret
+	u.TimeTokenInserted = time.Now().Format(time.RFC3339)
 }
 
 //

@@ -26,6 +26,61 @@ func InitPerUser(oathToken string, oathTokenSecret string) {
 // collectFriends collects friends into a slice from a given list and sorts
 // them according to their ID numerically. returns in a channel so it may
 // be done asynchronously
+
+// intersectSortedUsers return a third slice that includes only elements that are present in both
+func intersectSortedUsers(slice1, slice2 []anaconda.User, comp func(int, int) (bool, bool)) []anaconda.User {
+	var finalSlice []anaconda.User
+
+	for i, j := 0, 0; i < len(slice1) && j < len(slice2); {
+		eq, less := comp(i, j)
+
+		if less {
+			i++
+		} else if eq {
+			finalSlice = append(finalSlice, slice1[i])
+			i++
+			j++
+		} else {
+			j++
+		}
+	}
+	return finalSlice
+}
+
+// GetFollowers returns only the followers list for a single user in the form of an anaconda.User. unsorted
+func GetFollowers(screenName string) []anaconda.User {
+	var queries url.Values
+	queries.Add("screen_name", screenName)
+
+	followers := twitter.GetFollowersListAll(queries)
+	return <-collectFollowers(followers)
+}
+
+// GetMutuals retrieves a list of mutuals from a given username
+func GetMutuals(screenName string) []anaconda.User {
+	following, followers := getMutualsLists(screenName)
+
+	mutualsSlice := make([]anaconda.User, 0)
+	mutualsSlice = intersectSortedUsers(followers, following, func(i, j int) (bool, bool) {
+		return followers[i].Id == following[j].Id, followers[i].Id < following[i].Id
+	})
+
+	return mutualsSlice
+}
+
+//
+func getMutualsLists(screenName string) ([]anaconda.User, []anaconda.User) {
+	var queries url.Values
+
+	queries.Add("screen_name", screenName)
+	friends := twitter.GetFriendsListAll(queries)
+	followers := twitter.GetFollowersListAll(queries)
+
+	friendsList := <-collectFriends(friends)
+	follwersList := <-collectFollowers(followers)
+	return friendsList, follwersList
+}
+
 func collectFriends(friendsChannel chan anaconda.FriendsPage) chan []anaconda.User {
 	list := make(chan []anaconda.User)
 	go func() {
@@ -68,51 +123,6 @@ func collectFollowers(friendsChannel chan anaconda.FollowersPage) chan []anacond
 	}()
 
 	return list
-}
-
-// intersectSortedUsers return a third slice that includes only elements that are present in both
-func intersectSortedUsers(slice1, slice2 []anaconda.User, comp func(int, int) (bool, bool)) []anaconda.User {
-	var finalSlice []anaconda.User
-
-	for i, j := 0, 0; i < len(slice1) && j < len(slice2); {
-		eq, less := comp(i, j)
-
-		if less {
-			i++
-		} else if eq {
-			finalSlice = append(finalSlice, slice1[i])
-			i++
-			j++
-		} else {
-			j++
-		}
-	}
-	return finalSlice
-}
-
-// GetMutuals retrieves a list of mutuals from a given username
-func GetMutuals(screenName string) []anaconda.User {
-	following, followers := getMutualsLists(screenName)
-
-	mutualsSlice := make([]anaconda.User, 0)
-	mutualsSlice = intersectSortedUsers(followers, following, func(i, j int) (bool, bool) {
-		return followers[i].Id == following[j].Id, followers[i].Id < following[i].Id
-	})
-
-	return mutualsSlice
-}
-
-//
-func getMutualsLists(screenName string) ([]anaconda.User, []anaconda.User) {
-	var queries url.Values
-
-	queries.Add("screen_name", screenName)
-	friends := twitter.GetFriendsListAll(queries)
-	followers := twitter.GetFollowersListAll(queries)
-
-	friendsList := <-collectFriends(friends)
-	follwersList := <-collectFollowers(followers)
-	return friendsList, follwersList
 }
 
 // GetUnfollowingMutualsSorted something
@@ -176,7 +186,7 @@ func GetFilteredRetweets(user anaconda.User) ([]anaconda.Tweet, error) {
 // the two get filtered functions are remarkably similar see if you
 // can join the two together in some way. not critical
 
-// GetFilteredReplies something
+// GetFilteredReplies TODO
 func GetFilteredReplies(user anaconda.User) ([]anaconda.Tweet, error) {
 	var settings url.Values
 	var filteredTweets []anaconda.Tweet
@@ -201,7 +211,7 @@ func GetFilteredReplies(user anaconda.User) ([]anaconda.Tweet, error) {
 
 }
 
-// GetCollectedLikes something
+// GetCollectedLikes TODO
 func GetCollectedLikes() ([]anaconda.Tweet, error) {
 	var settings url.Values
 	settings.Add("count", "200")

@@ -115,11 +115,11 @@ func FetchUser(userID int64) User {
 }
 
 // FetchUserWithMutuals fetches the user and all it's Mutuals
-func FetchUserWithMutuals(userID int64) User {
+func FetchUserWithMutuals(userID int64) (User, error) {
 	var user User
 	user.UserID = userID
-	db.Preload("Mutuals").First(&user)
-	return user
+	err := db.Preload("Mutuals").First(&user).Error
+	return user, err
 
 }
 
