@@ -10,17 +10,20 @@ import (
 )
 
 var twitter *anaconda.TwitterApi
+var config *twitterAuthConfig
 
-// Init initializes the twitter client
-func Init() {
-	// consumer keys are per user
-	// pass them per request
-	twitter = anaconda.NewTwitterApiWithCredentials(accessToken, accessTokenSecret, consumerKey, consumerKeySecret)
+// Configure sets the app and developer authentication fields
+func Configure(configuration twitterAuthConfig) {
+	config = &configuration
 }
 
-// InitPerUser initializes the twitter client with a specic user to be accessed
-func InitPerUser(oathToken string, oathTokenSecret string) {
-	twitter = anaconda.NewTwitterApiWithCredentials(oathToken, oathTokenSecret, consumerKey, consumerKeySecret)
+// Init initializes the twitter client with the user's oauth credentials
+func Init(oauth, oauthSecret string) {
+	twitter = anaconda.NewTwitterApiWithCredentials(
+		oauth,
+		oauthSecret,
+		config.App.Consumer,
+		config.App.ConsumerSecret)
 }
 
 // collectFriends collects friends into a slice from a given list and sorts

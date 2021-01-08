@@ -22,7 +22,7 @@ func Init() {
 		secret := c.Request.Header["oathSecret"][0]
 		user, _ := strconv.ParseInt(c.Request.Header["userID"][0], 10, 64) // may be variable in url
 
-		twitterapi.InitPerUser(oath, secret)
+		twitterapi.Init(oath, secret)
 
 		// get followers from twitter
 		twitterMutuals := twitterapi.GetMutuals(c.Request.Header["username"][0])
@@ -47,7 +47,7 @@ func Init() {
 
 		// step 1 get user mutuals from twitter
 		rawMutuals := twitterapi.GetMutuals(c.Request.Header["username"][0])
-		dbReadyMutuals := twitterapi.ApiUsersToDatabaseUsers(rawMutuals)
+		dbReadyMutuals := twitterapi.APIUsersToDatabaseUsers(rawMutuals)
 
 		// step 2  submit to database with oath token and secret for user
 		registree := database.User{}

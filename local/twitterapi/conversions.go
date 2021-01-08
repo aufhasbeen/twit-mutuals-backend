@@ -7,8 +7,8 @@ import (
 	"github.com/aufheben/mutuals-server/local/database"
 )
 
-// ApiUsersToDatabaseUsers converts anaconda.user slices to database.user slices for use by the database
-func ApiUsersToDatabaseUsers(apiArray []anaconda.User) []database.User {
+// APIUsersToDatabaseUsers converts anaconda.user slices to database.user slices for use by the database
+func APIUsersToDatabaseUsers(apiArray []anaconda.User) []database.User {
 	var convertedArray []database.User
 	for _, user := range apiArray {
 		convertedUser := database.User{}

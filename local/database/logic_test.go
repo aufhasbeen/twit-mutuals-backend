@@ -42,10 +42,11 @@ func TestSubmitUser(t *testing.T) {
 	var outUser User
 
 	user := User{}
+	user.UserID = 2
 	SubmitUser(&user)
 	defer db.Delete(&User{}, 0)
 
-	db.First(&outUser, 0)
+	db.First(&outUser, 2)
 	if outUser.UserID != user.UserID {
 		t.Error("user not submitted")
 	}

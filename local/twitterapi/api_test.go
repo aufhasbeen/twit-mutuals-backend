@@ -1,17 +1,31 @@
 package twitterapi
 
 import (
+	"os"
 	"testing"
 
 	"github.com/ChimeraCoder/anaconda"
+	"github.com/spf13/viper"
 )
 
 func setup() {
-	accessToken = ""
-	accessTokenSecret = ""
-	consumerKey = ""
-	consumerKeySecret = ""
-	Init()
+	var Conf Config
+
+	viper.SetConfigName(".config.yaml")
+	viper.AddConfigPath(".")
+	viper.SetConfigType("yaml")
+	if err := viper.ReadInConfig(); err != nil {
+		print(err.Error())
+		os.Exit(1)
+	}
+	if err := viper.Unmarshal(&Conf); err != nil {
+		print(err.Error())
+		os.Exit(2)
+	}
+	authConfig := Conf.authentication
+
+	Configure(authConfig)
+	Init(authConfig.Developer.Oauth, authConfig.Developer.OauthSecret)
 }
 
 func TestMain(m *testing.M) {
@@ -19,7 +33,8 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestTestSliceReflectionUser(test *testing.T) {
+func TestSliceReflectionUser(test *testing.T) {
+	print("here")
 	arr1 := make([]anaconda.User, 6)
 	arr2 := make([]anaconda.User, 3)
 
@@ -40,12 +55,12 @@ func TestTestSliceReflectionUser(test *testing.T) {
 	}
 }
 
-func TestGetMutuals(test *testing.T) {
-	screenName := ""
+// func TestGetMutuals(test *testing.T) {
+// 	screenName := ""
 
-	mutuals := GetMutuals(screenName)
+// 	mutuals := GetMutuals(screenName)
 
-	if len(mutuals) > 0 {
-		print(mutuals[0])
-	}
-}
+// 	if len(mutuals) > 0 {
+// 		print(mutuals[0])
+// 	}
+// }
