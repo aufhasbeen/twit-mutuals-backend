@@ -2,7 +2,7 @@ package twitterapi
 
 // Config holds the configuration data for the developer and twitter app
 type Config struct {
-	authentication twitterAuthConfig
+	Authentication twitterAuthConfig
 }
 
 type twitterAuthConfig struct {

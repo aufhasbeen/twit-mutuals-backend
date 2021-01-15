@@ -17,6 +17,7 @@ type userScorestruct struct {
 	replies  int
 }
 
+// User struct models a user
 type User struct {
 	ID         int64
 	mutuals    []anaconda.User // needs to be sorted
@@ -24,6 +25,7 @@ type User struct {
 	topTen     []userScorestruct
 }
 
+// AnalyzeMutuals returns a list of top ten mutuals in order of most interactions
 func (u *User) AnalyzeMutuals() {
 	// TODO: take mutuals list and make a list of the top ten mutuals by
 	// interaction with the given u
@@ -64,7 +66,7 @@ func (u *User) byLikes() {
 	// mutual
 	for _, likeTweet := range likes {
 		if _, ok := mutualsMap[likeTweet.User.Id]; ok {
-			mutualsMap[likeTweet.User.Id] += 1
+			mutualsMap[likeTweet.User.Id]++
 		}
 	}
 

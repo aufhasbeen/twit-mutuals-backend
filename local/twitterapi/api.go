@@ -24,6 +24,7 @@ func Init(oauth, oauthSecret string) {
 		oauthSecret,
 		config.App.Consumer,
 		config.App.ConsumerSecret)
+
 }
 
 // collectFriends collects friends into a slice from a given list and sorts
@@ -50,82 +51,132 @@ func intersectSortedUsers(slice1, slice2 []anaconda.User, comp func(int, int) (b
 	return finalSlice
 }
 
+func intersectSortedIDs(slice1, slice2 []int64, comp func(int, int) (bool, bool)) []int64 {
+	var finalSlice []int64
+
+	for i, j := 0, 0; i < len(slice1) && j < len(slice2); {
+		eq, less := comp(i, j)
+
+		if less {
+			i++
+		} else if eq {
+			finalSlice = append(finalSlice, slice1[i])
+			i++
+			j++
+		} else {
+			j++
+		}
+	}
+	return finalSlice
+}
+
 // GetFollowers returns only the followers list for a single user in the form of an anaconda.User. unsorted
-func GetFollowers(screenName string) []anaconda.User {
-	var queries url.Values
+func GetFollowers(screenName string) []int64 {
+	queries := make(url.Values)
+
 	queries.Add("screen_name", screenName)
 
-	followers := twitter.GetFollowersListAll(queries)
-	return <-collectFollowers(followers)
+	followers := twitter.GetFollowersIdsAll(queries)
+	return collectFollowersID(followers)
 }
 
 // GetMutuals retrieves a list of mutuals from a given username
-func GetMutuals(screenName string) []anaconda.User {
-	following, followers := getMutualsLists(screenName)
+func GetMutuals(screenName string) []int64 {
+	following, followers := getMutualsIDs(screenName)
 
-	mutualsSlice := make([]anaconda.User, 0)
-	mutualsSlice = intersectSortedUsers(followers, following, func(i, j int) (bool, bool) {
-		return followers[i].Id == following[j].Id, followers[i].Id < following[i].Id
+	mutualsSlice := make([]int64, 0)
+	mutualsSlice = intersectSortedIDs(followers, following, func(i, j int) (bool, bool) {
+		return followers[i] == following[j], followers[i] < following[i]
 	})
 
 	return mutualsSlice
 }
 
+// func getHomeTimeline(screenName string) ([]anaconda.Tweet, error) {
+// 	queries := make(url.Values)
+
+// 	queries.Add("screen_name", screenName)
+// 	return twitter.GetHomeTimeline(queries)
+// }
+
 //
 func getMutualsLists(screenName string) ([]anaconda.User, []anaconda.User) {
-	var queries url.Values
+	queries := make(url.Values)
 
 	queries.Add("screen_name", screenName)
 	friends := twitter.GetFriendsListAll(queries)
 	followers := twitter.GetFollowersListAll(queries)
 
-	friendsList := <-collectFriends(friends)
-	follwersList := <-collectFollowers(followers)
+	friendsList := collectFriends(friends)
+	follwersList := collectFollowers(followers)
 	return friendsList, follwersList
 }
 
-func collectFriends(friendsChannel chan anaconda.FriendsPage) chan []anaconda.User {
-	list := make(chan []anaconda.User)
-	go func() {
-		idList := make([]anaconda.User, 0)
+func getMutualsIDs(screenName string) ([]int64, []int64) {
+	queries := make(url.Values)
 
-		for page := range friendsChannel {
-			idList = append(idList, page.Friends...)
-		}
+	queries.Add("screen_name", screenName)
+	friends := twitter.GetFriendsIdsAll(queries)
+	followers := twitter.GetFollowersIdsAll(queries)
 
-		sort.Slice(idList, func(i, j int) bool {
-			return idList[i].Id < idList[j].Id
-		})
+	friendsList := collectFriendsID(friends)
+	follwersList := collectFollowersID(followers)
+	return friendsList, follwersList
+}
 
-		list <- idList
-		close(list)
-	}()
+func collectFriends(friendsChannel chan anaconda.FriendsPage) []anaconda.User {
+	idList := make([]anaconda.User, 0)
+	for page := range friendsChannel {
+		idList = append(idList, page.Friends...)
+	}
 
-	return list
+	sort.Slice(idList, func(i, j int) bool {
+		return idList[i].Id < idList[j].Id
+	})
+
+	return idList
+}
+
+func collectFriendsID(friendsChannel chan anaconda.FriendsIdsPage) []int64 {
+	idList := make([]int64, 0)
+	for page := range friendsChannel {
+		idList = append(idList, page.Ids...)
+	}
+
+	sort.Slice(idList, func(i, j int) bool {
+		return idList[i] < idList[j]
+	})
+
+	return idList
 }
 
 // collectFollowers collects followers into a list from a given list and sorts
 // them according to their ID numerically. returns in a channel so it may be
 // asynchronous
-func collectFollowers(friendsChannel chan anaconda.FollowersPage) chan []anaconda.User {
-	list := make(chan []anaconda.User)
+func collectFollowers(friendsChannel chan anaconda.FollowersPage) []anaconda.User {
+	idList := make([]anaconda.User, 0)
+	for page := range friendsChannel {
+		idList = append(idList, page.Followers...)
+	}
 
-	go func() {
-		idList := make([]anaconda.User, 0)
+	sort.Slice(idList, func(i, j int) bool {
+		return idList[i].Id < idList[j].Id
+	})
 
-		for page := range friendsChannel {
-			idList = append(idList, page.Followers...)
-		}
+	return idList
+}
 
-		sort.Slice(idList, func(i, j int) bool {
-			return idList[i].Id < idList[j].Id
-		})
+func collectFollowersID(followersChannel chan anaconda.FollowersIdsPage) []int64 {
+	idList := make([]int64, 0)
+	for page := range followersChannel {
+		idList = append(idList, page.Ids...)
+	}
 
-		list <- idList
-		close(list)
-	}()
+	sort.Slice(idList, func(i, j int) bool {
+		return idList[i] < idList[j]
+	})
 
-	return list
+	return idList
 }
 
 // GetUnfollowingMutualsSorted something

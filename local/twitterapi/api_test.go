@@ -1,6 +1,7 @@
 package twitterapi
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -9,20 +10,21 @@ import (
 )
 
 func setup() {
-	var Conf Config
-
-	viper.SetConfigName(".config.yaml")
-	viper.AddConfigPath(".")
-	viper.SetConfigType("yaml")
-	if err := viper.ReadInConfig(); err != nil {
+	Conf := Config{}
+	v := viper.New()
+	v.SetConfigName(".config.yaml")
+	v.AddConfigPath(".")
+	v.SetConfigType("yaml")
+	if err := v.ReadInConfig(); err != nil {
 		print(err.Error())
 		os.Exit(1)
 	}
-	if err := viper.Unmarshal(&Conf); err != nil {
+	if err := v.Unmarshal(&Conf); err != nil {
 		print(err.Error())
 		os.Exit(2)
 	}
-	authConfig := Conf.authentication
+	println()
+	authConfig := Conf.Authentication
 
 	Configure(authConfig)
 	Init(authConfig.Developer.Oauth, authConfig.Developer.OauthSecret)
@@ -55,12 +57,14 @@ func TestSliceReflectionUser(test *testing.T) {
 	}
 }
 
-// func TestGetMutuals(test *testing.T) {
-// 	screenName := ""
+func TestGetMutuals(test *testing.T) {
+	screenName := "insert screen name"
 
-// 	mutuals := GetMutuals(screenName)
+	mutuals := GetMutuals(screenName)
 
-// 	if len(mutuals) > 0 {
-// 		print(mutuals[0])
-// 	}
-// }
+	if len(mutuals) > 0 {
+		test.Errorf(fmt.Sprint(mutuals[0]))
+	} else {
+		test.Errorf("no mutuals returned")
+	}
+}
