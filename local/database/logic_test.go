@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/aufheben/mutuals-server/local/database/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -22,7 +23,7 @@ func setup() {
 		log.Fatal(err.Error())
 	}
 	// make relevant tables
-	db.AutoMigrate(&User{})
+	db.AutoMigrate(&models.User{})
 }
 
 func teardown() {
@@ -39,12 +40,12 @@ func TestMain(m *testing.M) {
 }
 
 func TestSubmitUser(t *testing.T) {
-	var outUser User
+	var outUser models.User
 
-	user := User{}
+	user := models.User{}
 	user.UserID = 2
 	SubmitUser(&user)
-	defer db.Delete(&User{}, 0)
+	defer db.Delete(&models.User{}, 0)
 
 	db.First(&outUser, 2)
 	if outUser.UserID != user.UserID {
@@ -54,12 +55,12 @@ func TestSubmitUser(t *testing.T) {
 }
 
 func TestFetchUserWithMutuals(t *testing.T) {
-	var dummyUserA, dummyUserB, dbUser User
+	var dummyUserA, dummyUserB, dbUser models.User
 
 	dummyUserA.UserID = 37
 	dummyUserB.UserID = 47
-	dummyUserA.Mutuals = append(dummyUserA.Mutuals, dummyUserB)
-	dummyUserB.Mutuals = append(dummyUserB.Mutuals, dummyUserA)
+	dummyUserA.Mutuals = append(dummyUserA.Mutuals, dummyUserB.DBUser)
+	dummyUserB.Mutuals = append(dummyUserB.Mutuals, dummyUserA.DBUser)
 
 	SubmitUser(&dummyUserA)
 	SubmitUser(&dummyUserB)

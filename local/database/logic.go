@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/aufheben/mutuals-server/local/database/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -97,26 +98,28 @@ func Init(dbSystem dbType) {
 }
 
 func primeDb() {
-	db.AutoMigrate(&User{}) // , &Mutual{})
+	db.AutoMigrate(&models.User{}) // , &Mutual{})
 }
 
 // Actual beginning of database queries
 
 // SubmitUser uploads the user to the database ensuring a unique id
-func SubmitUser(user *User) {
+func SubmitUser(user *models.User) {
 	db.Save(user)
 }
 
-// FetchUser retrieves a user and their mutual list
-func FetchUser(userID int64) User {
-	var user User
-	db.First(&user, userID)
+// FetchUser retrieves a user without its mutual list
+func FetchUser(screenName string) models.User {
+	var user models.User
+	var queryUser models.User
+	queryUser.ScreenName = screenName
+	db.Where(&queryUser).First(&user)
 	return user
 }
 
 // FetchUserWithMutuals fetches the user and all it's Mutuals
-func FetchUserWithMutuals(userID int64) (User, error) {
-	var user User
+func FetchUserWithMutuals(userID int64) (models.User, error) {
+	var user models.User
 	user.UserID = userID
 	err := db.Preload("Mutuals").First(&user).Error
 	return user, err

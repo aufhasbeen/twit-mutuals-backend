@@ -3,9 +3,10 @@ package routing
 import (
 	"errors"
 	"net/http"
-	"strconv"
 
+	"github.com/aufheben/mutuals-server/local/conf"
 	"github.com/aufheben/mutuals-server/local/database"
+	"github.com/aufheben/mutuals-server/local/database/models"
 	"github.com/aufheben/mutuals-server/local/twitterapi"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -15,48 +16,140 @@ var gEngine *gin.Engine
 
 // Init initializes the router middleware
 func Init() {
+
 	gEngine = gin.Default()
+	api := gEngine.Group("/api/")
+	conf.Configure()
 
-	gEngine.GET("/unfollows", func(c *gin.Context) {
-		oath := c.Request.Header["oath"][0]
-		secret := c.Request.Header["oathSecret"][0]
-		user, _ := strconv.ParseInt(c.Request.Header["userID"][0], 10, 64) // may be variable in url
+	// uncomment when ready for user specific sessions
+	// gEngine.Use(func(c *gin.Context) {
+	// 	conf.OverwriteUserCredentials(c.Request.Header["oauth"][0], c.Request.Header["oauthSecret"][0])
+	// })
 
-		twitterapi.Init(oath, secret)
+	api.GET("/exMutuals", func(c *gin.Context) {
+		sessionInfo := sessionHeader{}
+		sessionInfo.startSession(c.Request.Header)
+		twitterapi.Init(conf.GetConfig())
+
+		screenName := c.Request.URL.Query().Get("screenName")
+		if screenName == "" {
+			c.JSON(http.StatusExpectationFailed, gin.H{"message": "screenName url paramater not provided"})
+			return
+		}
 
 		// get followers from twitter
-		twitterMutuals := twitterapi.GetMutuals(c.Request.Header["username"][0])
+		twitterMutuals := twitterapi.GetMutuals(screenName)
 
 		// should also return an error when user is not registered in db
-		dbUser, err := database.FetchUserWithMutuals(user)
+		dbUser, err := database.FetchUserWithMutuals(sessionInfo.twitUser)
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.Status(http.StatusNotFound)
 			return
+		} else if !dbUser.Registered {
+			c.JSON(http.StatusPreconditionFailed, gin.H{"message": "user not registered"})
+			return
 		}
 
 		// twitterapi.GetUnfollowingMutualsSorted(mutuals, )
-		unfollowers := twitterapi.GetUnfollowingMutualsSorted(dbUser.Mutuals, twitterMutuals)
+		unfollowers := twitterapi.GetUnfollowingMutualsSortedIDS(dbUser.Mutuals, twitterMutuals)
 		c.JSON(http.StatusOK, gin.H{"mutuals": unfollowers})
 	})
 
-	gEngine.GET("/register", func(c *gin.Context) {
-		oath := c.Request.Header["oath"][0]                                // per user
-		secret := c.Request.Header["oathSecret"][0]                        // per user
-		user, _ := strconv.ParseInt(c.Request.Header["userID"][0], 10, 64) // may be variable in url
+	api.GET("/mutuals", func(c *gin.Context) {
+		sessionInfo := sessionHeader{}
+		sessionInfo.startSession(c.Request.Header)
+		twitterapi.Init(conf.GetConfig())
+
+		screenName := c.Request.URL.Query().Get("screenName")
+		if screenName == "" {
+			c.JSON(http.StatusExpectationFailed, gin.H{"message": "screenName url paramater not provided"})
+			return
+		}
+
+		// get followers from twitter
+		twitterMutuals := twitterapi.GetMutuals(screenName)
+
+		// twitterapi.GetUnfollowingMutualsSorted(mutuals, )
+		c.JSON(http.StatusOK, twitterMutuals)
+	})
+
+	api.GET("/profileData", func(c *gin.Context) {
+		sessionInfo := sessionHeader{}
+		sessionInfo.startSession(c.Request.Header)
+		twitterapi.Init(conf.GetConfig())
+
+		screenName := c.Request.URL.Query().Get("screenName")
+		println()
+
+		ok, err := twitterapi.GetUser(screenName)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+			return
+		}
+
+		c.JSON(http.StatusOK, ok)
+	})
+
+	api.POST("/profileData", func(c *gin.Context) {
+		sessionInfo := sessionHeader{}
+		sessionInfo.startSession(c.Request.Header) // currently does nothing
+		twitterapi.Init(conf.GetConfig())
+
+		IDs := make([]int64, 0)
+
+		c.BindJSON(&IDs)
+
+		println(len(IDs))
+		ok, err := twitterapi.GetUsersByID(IDs)
+		if err != nil {
+			c.JSON(http.StatusOK, make([]int64, 0))
+			return
+		}
+
+		c.JSON(http.StatusOK, ok)
+	})
+
+	api.GET("/register", func(c *gin.Context) {
+		sessionInfo := sessionHeader{}
+		sessionInfo.startSession(c.Request.Header)
+		twitterapi.Init(conf.GetConfig())
 
 		// step 1 get user mutuals from twitter
-		rawMutuals := twitterapi.GetMutuals(c.Request.Header["username"][0])
-		dbReadyMutuals := twitterapi.APIUsersToDatabaseUsers(rawMutuals)
+		rawMutuals := twitterapi.GetMutuals(c.Query("screenName"))
+		dbReadyMutuals := twitterapi.AnacondaIDsToDatabaseUsers(rawMutuals)
 
 		// step 2  submit to database with oath token and secret for user
-		registree := database.User{}
-		registree.UserID = user
+		registree := models.User{}
+		registree.UserID = sessionInfo.twitUser
 		registree.Mutuals = dbReadyMutuals
-		registree.RefreshToken(oath, secret)
+		registree.Registered = true
+		// registree.RefreshToken(sessionInfo.oauthPub, sessionInfo.oauthPriv)
 
 		database.SubmitUser(&registree)
 		c.Status(http.StatusOK)
+	})
+
+	api.GET("/registered", func(c *gin.Context) {
+		sessionInfo := sessionHeader{}
+		sessionInfo.startSession(c.Request.Header)
+		twitterapi.Init(conf.GetConfig())
+
+		screenName := c.Request.URL.Query().Get("screenName")
+		if screenName == "" {
+			c.JSON(http.StatusExpectationFailed, gin.H{"message": "screenName url paramater not provided"})
+			return
+		}
+
+		user := database.FetchUser(screenName)
+		c.JSON(http.StatusOK, user.Registered)
+	})
+
+	api.GET("/unfollow", func(c *gin.Context) {
+		sessionInfo := sessionHeader{}
+		sessionInfo.startSession(c.Request.Header)
+
+		twitterapi.Init(conf.GetConfig())
 	})
 
 }

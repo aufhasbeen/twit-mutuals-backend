@@ -3,27 +3,22 @@ package twitterapi
 import (
 	"net/url"
 	"sort"
-	"strconv"
 
 	"github.com/ChimeraCoder/anaconda"
-	"github.com/aufheben/mutuals-server/local/database"
+	"github.com/aufheben/mutuals-server/local/conf"
+	"github.com/aufheben/mutuals-server/local/database/models"
 )
 
 var twitter *anaconda.TwitterApi
-var config *twitterAuthConfig
-
-// Configure sets the app and developer authentication fields
-func Configure(configuration twitterAuthConfig) {
-	config = &configuration
-}
 
 // Init initializes the twitter client with the user's oauth credentials
-func Init(oauth, oauthSecret string) {
+func Init(config *conf.Config) {
+	auth := config.Authentication
 	twitter = anaconda.NewTwitterApiWithCredentials(
-		oauth,
-		oauthSecret,
-		config.App.Consumer,
-		config.App.ConsumerSecret)
+		auth.Developer.Oauth,
+		auth.Developer.OauthSecret,
+		auth.App.Consumer,
+		auth.App.ConsumerSecret)
 
 }
 
@@ -84,9 +79,19 @@ func GetFollowers(screenName string) []int64 {
 func GetMutuals(screenName string) []int64 {
 	following, followers := getMutualsIDs(screenName)
 
-	mutualsSlice := make([]int64, 0)
-	mutualsSlice = intersectSortedIDs(followers, following, func(i, j int) (bool, bool) {
-		return followers[i] == following[j], followers[i] < following[i]
+	mutualsSlice := intersectSortedIDs(followers, following, func(i, j int) (bool, bool) {
+		return followers[i] == following[j], followers[i] < following[j]
+	})
+
+	return mutualsSlice
+}
+
+// GetMutualsUser retrieves a list of mutuals using the anaconda user object
+func GetMutualsUser(screenName string) []anaconda.User {
+	following, followers := getMutualsLists(screenName)
+
+	mutualsSlice := intersectSortedUsers(followers, following, func(i, j int) (bool, bool) {
+		return followers[i].Id == following[j].Id, followers[i].Id < following[j].Id
 	})
 
 	return mutualsSlice
@@ -104,6 +109,7 @@ func getMutualsLists(screenName string) ([]anaconda.User, []anaconda.User) {
 	queries := make(url.Values)
 
 	queries.Add("screen_name", screenName)
+	queries.Add("include_user_entities", "false")
 	friends := twitter.GetFriendsListAll(queries)
 	followers := twitter.GetFollowersListAll(queries)
 
@@ -179,10 +185,38 @@ func collectFollowersID(followersChannel chan anaconda.FollowersIdsPage) []int64
 	return idList
 }
 
-// GetUnfollowingMutualsSorted something
-func GetUnfollowingMutualsSorted(databaseList []database.User, followersList []anaconda.User) []database.User {
+// GetUnfollowingMutualsSortedIDS returns a list of unfollowing mutuals sorted using the IDs list instead of anaconda.Users
+func GetUnfollowingMutualsSortedIDS(databaseList []models.DBUser, followersList []int64) []models.DBUser {
 	// assumes databaseList and followersList are sorted
-	unfollowedMutuals := make([]database.User, 0)
+	unfollowedMutuals := make([]models.DBUser, 0)
+	comp := func(i, j int) (bool, bool) {
+		return databaseList[i].UserID == followersList[j],
+			databaseList[j].UserID < followersList[j]
+	}
+	databaseListLength := len(databaseList)
+	followersListLength := len(followersList)
+
+	for i, j := 0, 0; i < databaseListLength && j < followersListLength; {
+
+		eq, less := comp(i, j)
+
+		if eq {
+			i++
+			j++
+		} else if less {
+			unfollowedMutuals = append(unfollowedMutuals, databaseList[i])
+			i++
+		} else {
+			j++
+		}
+	}
+	return unfollowedMutuals
+}
+
+// GetUnfollowingMutualsSorted something
+func GetUnfollowingMutualsSorted(databaseList []models.User, followersList []anaconda.User) []models.User {
+	// assumes databaseList and followersList are sorted
+	unfollowedMutuals := make([]models.User, 0)
 	comp := func(i, j int) (bool, bool) {
 		return databaseList[i].UserID == followersList[j].Id,
 			databaseList[j].UserID < followersList[j].Id
@@ -209,99 +243,9 @@ func GetUnfollowingMutualsSorted(databaseList []database.User, followersList []a
 
 // above get mutuals
 
-//
+// func interactionsUser(comparisonUser anaconda.User, analysesUser anaconda.User) {
+// 	// TODO: return a list giving an analyses of user interactions
+// 	// (likes ftu, retweets ftu, replies ftu, total ftu, total)
+// 	// ftu = from target user
 
-// below filters for interactions
-
-// GetFilteredRetweets returns a list of twitter users that the authenticated
-// user has retweeted.
-func GetFilteredRetweets(user anaconda.User) ([]anaconda.Tweet, error) {
-	var settings url.Values
-	var filteredTweets []anaconda.Tweet
-
-	settings.Add("count", "200")
-
-	for i := 0; i < 800; i += 200 {
-		tweets, err := twitter.GetHomeTimeline(settings)
-
-		if err != nil {
-			return nil, err
-		}
-
-		// removes the user from his own timeline
-		filteredTweets = filterTweetsByID(tweets, user.Id)
-		lastTweetID := strconv.FormatInt(tweets[len(tweets)-1].Id+1, 10)
-		settings.Set("max_id", lastTweetID)
-	}
-
-	return filteredTweets, nil
-}
-
-// the two get filtered functions are remarkably similar see if you
-// can join the two together in some way. not critical
-
-// GetFilteredReplies TODO
-func GetFilteredReplies(user anaconda.User) ([]anaconda.Tweet, error) {
-	var settings url.Values
-	var filteredTweets []anaconda.Tweet
-
-	settings.Add("count", "200")
-
-	for i := 0; i < 800; i += 200 {
-		tweets, err := twitter.GetMentionsTimeline(settings)
-
-		if err != nil {
-			return nil, err
-		}
-
-		// need to change to new function, this one filters by what user
-		// posted the reply not to what user the reply was posted to.
-		filteredTweets = filterTweetsByID(tweets, user.Id)
-		lastTweetID := strconv.FormatInt(tweets[len(tweets)-1].Id+1, 10)
-		settings.Set("max_id", lastTweetID)
-	}
-
-	return filteredTweets, nil
-
-}
-
-// GetCollectedLikes TODO
-func GetCollectedLikes() ([]anaconda.Tweet, error) {
-	var settings url.Values
-	settings.Add("count", "200")
-	var favoriteTweets []anaconda.Tweet
-
-	for i := 0; i < 800; i += 200 {
-		favoriteTweets, err := twitter.GetFavorites(settings)
-
-		if err != nil {
-			return nil, err
-		}
-
-		// need to change to new function, this one filters by what user
-		// posted the reply not to what user the reply was posted to.
-		lastTweetID := strconv.FormatInt(favoriteTweets[len(favoriteTweets)-1].Id+1, 10)
-		settings.Set("max_id", lastTweetID)
-	}
-	return favoriteTweets, nil
-}
-
-// filters tweets by id
-func filterTweetsByID(tweets []anaconda.Tweet, ID int64) []anaconda.Tweet {
-	filteredTweets := make([]anaconda.Tweet, 0)
-	for _, tweet := range tweets {
-		if tweet.User.Id != ID {
-			filteredTweets = append(filteredTweets, tweet)
-		}
-	}
-
-	return filteredTweets
-
-}
-
-func interactionsUser(comparisonUser anaconda.User, analysesUser anaconda.User) {
-	// TODO: return a list giving an analyses of user interactions
-	// (likes ftu, retweets ftu, replies ftu, total ftu, total)
-	// ftu = from target user
-
-}
+// }

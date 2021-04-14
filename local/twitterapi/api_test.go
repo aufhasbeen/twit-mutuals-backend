@@ -1,33 +1,17 @@
 package twitterapi
 
 import (
-	"fmt"
-	"os"
 	"testing"
 
 	"github.com/ChimeraCoder/anaconda"
-	"github.com/spf13/viper"
+	"github.com/aufheben/mutuals-server/local/conf"
 )
 
 func setup() {
-	Conf := Config{}
-	v := viper.New()
-	v.SetConfigName(".config.yaml")
-	v.AddConfigPath(".")
-	v.SetConfigType("yaml")
-	if err := v.ReadInConfig(); err != nil {
-		print(err.Error())
-		os.Exit(1)
-	}
-	if err := v.Unmarshal(&Conf); err != nil {
-		print(err.Error())
-		os.Exit(2)
-	}
-	println()
-	authConfig := Conf.Authentication
+	conf.Configure()
+	authConfig := conf.GetConfig()
 
-	Configure(authConfig)
-	Init(authConfig.Developer.Oauth, authConfig.Developer.OauthSecret)
+	Init(authConfig)
 }
 
 func TestMain(m *testing.M) {
@@ -36,7 +20,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestSliceReflectionUser(test *testing.T) {
-	print("here")
 	arr1 := make([]anaconda.User, 6)
 	arr2 := make([]anaconda.User, 3)
 
@@ -62,9 +45,24 @@ func TestGetMutuals(test *testing.T) {
 
 	mutuals := GetMutuals(screenName)
 
-	if len(mutuals) > 0 {
-		test.Errorf(fmt.Sprint(mutuals[0]))
-	} else {
+	if len(mutuals) <= 0 {
 		test.Errorf("no mutuals returned")
+	}
+}
+
+func TestGetUsersByID(test *testing.T) {
+	screenName := "yesmustard"
+
+	// mutuals := GetFollowers(screenName)
+	mutuals := GetMutuals(screenName)
+	// for mutual := range mutuals {
+	// 	fmt.Printf("%+v/n", mutual)
+	// }
+	mutualProfiles, err := GetUsersByID(mutuals[0:100])
+
+	if err != nil {
+		test.Errorf(err.Error())
+	} else if len(mutualProfiles) <= 0 {
+		test.Errorf("too small")
 	}
 }
